@@ -8,7 +8,7 @@ Jonmohamadi et al, MICCAI 2021.
 >
 > [MICCAI 2021]
 
-This repository is modified version of Monodepth2 [Monodepth2](https://github.com/nianticlabs/monodepth2) in order to incorportate pose supervision in the original self supervised implementation. Please reference the mentioned papers if you you are using this repository. 
+This repository is modified version of [Monodepth2](https://github.com/nianticlabs/monodepth2) in order to incorportate pose supervision in the original self supervised implementation. Please reference the mentioned papers if you you are using this repository. 
 
 TO DO LIST:
 
