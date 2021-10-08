@@ -18,12 +18,14 @@ pip install tensorboardX==1.4
 It is tested on Ubuntu 18 and cuda 10. 
 
 A pretrained model on limited number of images (~8300) is provided. For your application further training might be required. 
-Sample training and validation data are provided. 
+Sample training and validation data are provided. The training options for this model are:
+--dataset Custom --split 3DPrint --png --height 256 --width 256 --frame_ids 0 2 --disparity_smoothness .01  
+--use_pose 1 --use_stereo --pose_model_input all
 
 
-## 🖼️ Prediction for a single image
+## Prediction for a pose and images
 
-You can predict scaled disparity for a single image with:
+Use this command to predict disparity for a images in a folder:
 
 ```shell
 python test_simple.py --image_path assets/test_image.jpg --model_name mono+stereo_640x192
@@ -33,7 +35,7 @@ or, if you are using a stereo-trained model, you can estimate metric depth with
 
 ```shell
 python test_simple.py --image_path assets/test_image.jpg --model_name mono+stereo_640x192 --pred_metric_depth
-
+```
 
 TO DO LIST:
 
