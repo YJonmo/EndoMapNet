@@ -10,6 +10,8 @@ Jonmohamadi et al, MICCAI 2021.
 
 This repository is modified version of [Monodepth2](https://github.com/nianticlabs/monodepth2) in order to incorportate pose supervision in the original self supervised implementation. Please reference the mentioned papers if you you are using this repository. 
 
+[![Open In Colab](https://colab.research.google.com/drive/13wVWBbMGv6unxN-NunVLSbl9ywwTdY8X?usp=sharing)
+
 ## ⚙️ Setup
 
 conda install pytorch=0.4.1 torchvision=0.2.1 -c pytorch
