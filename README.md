@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# EndoMapNet
-=======
 
 # EndoMapNet
 This is the reference implementation for training and testing depth and pose estimation models using the method described in
@@ -28,7 +25,7 @@ Sample training and validation data are provided. The training options for this 
 
 ## Prediction for a pose and images
 
-Use this command to predict disparity for a images in a folder:
+Following commands show how to get the disparity and poses for sample images proveded:
 
 ```shell
 python test_simple.py --image_path assets/test_image.jpg --model_name mono+stereo_640x192
@@ -47,4 +44,4 @@ Sample training use
 Google colab training examples
 
 Pretrained model
->>>>>>> 3923b7d53cbbdd77b036481837433b19e9da18d7
+
