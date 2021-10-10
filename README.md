@@ -12,7 +12,6 @@ This repository is modified version of [Monodepth2](https://github.com/nianticla
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/13wVWBbMGv6unxN-NunVLSbl9ywwTdY8X?usp=sharing)
 
-https://colab.research.google.com/drive/13wVWBbMGv6unxN-NunVLSbl9ywwTdY8X?usp=sharing
 
 ## ⚙️ Setup
 
