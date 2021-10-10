@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+#from tensorboard import SummaryWriter
 
 import json
 
@@ -243,12 +244,13 @@ class Trainer:
             len(train_dataset)))
 
         self.save_opts()
-        self.opt.trans_weight=torch.from_numpy(np.array(self.opt.trans_weight))
+        #self.opt.trans_weight=torch.from_numpy(np.array(self.opt.trans_weight))
+        self.opt.trans_weight=torch.Tensor(np.array(self.opt.trans_weight))
         self.opt.trans_weight = self.opt.trans_weight.to(self.device)
         if self.opt.use_pose=='1':
-            self.last_loss = self.criterion(torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64))
+            self.last_loss = self.criterion(torch.zeros(1, dtype=torch.float32), torch.zeros(1, dtype=torch.float32))
             self.last_loss = self.last_loss.to(self.device)
-            self.last_loss_val = self.criterion(torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64))
+            self.last_loss_val = self.criterion(torch.zeros(1, dtype=torch.float32), torch.zeros(1, dtype=torch.float32))
             self.last_loss_val = self.last_loss_val.to(self.device)
     def set_train(self):
         """Convert all models to training mode
@@ -284,6 +286,7 @@ class Trainer:
         self.set_train()
 
         for batch_idx, inputs in enumerate(self.train_loader):
+            
             print('batch_idxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ' + str(batch_idx) + str('   self.epoch ')+ str(self.epoch))
             #print(inputs)
             before_op_time = time.time()
@@ -293,6 +296,7 @@ class Trainer:
             self.model_optimizer.zero_grad()
             losses["loss"].backward()
             self.model_optimizer.step()
+            #time.sleep(20.0)
 #            if self.opt.use_pose=='1':
 #                outputs2, losses2 = self.process_batch2(inputs)
 #                self.model_optimizer2.zero_grad()   # clear the buffer
@@ -652,6 +656,7 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
+        #total_loss = torch.tensor([total_loss], dtype=torch.double)
         
         
         losses2 = {}
@@ -661,15 +666,15 @@ class Trainer:
             for frame_id in (self.opt.frame_ids[1:]):
                 if frame_id != "s":
                     frame_lengh +=1   
-            translation_gt = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=True, dtype=torch.float64) 
+            translation_gt = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
             translation_gt = translation_gt.to(device='cuda')
-            translation_pred = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=False, dtype=torch.float64) 
+            translation_pred = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=False, dtype=torch.float32) 
             translation_pred = translation_pred.to(device='cuda')
-            axisangle_gt = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=True, dtype=torch.float64) 
+            axisangle_gt = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
             axisangle_gt = axisangle_gt.to(device='cuda')
-            axisangle_pred = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=False, dtype=torch.float64) 
+            axisangle_pred = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=False, dtype=torch.float32) 
             axisangle_pred = axisangle_pred.to(device='cuda')
-            #abs_diff_axang = torch.zeros(i, dtype=torch.float64) 
+            #abs_diff_axang = torch.zeros(i, dtype=torch.float32) 
             i=0
             for frame_id in (self.opt.frame_ids[1:]):
                 if frame_id != "s":
@@ -689,21 +694,21 @@ class Trainer:
                 if  torch.norm(translation_gt[Bach_ind,:, 0]) != 0:
                     NonZeroBatch +=1   
             if NonZeroBatch != 0:
-                translation_gt2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                translation_gt2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 translation_gt2 = translation_gt2.to(device='cuda')
-                translation_pred2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                translation_pred2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 translation_pred2 = translation_pred2.to(device='cuda')
-                axisangle_gt2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                axisangle_gt2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 axisangle_gt2 = axisangle_gt2.to(device='cuda')
-                axisangle_pred2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                axisangle_pred2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 axisangle_pred2 = axisangle_pred2.to(device='cuda')
-                translation_GtMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                translation_GtMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 translation_GtMag = translation_GtMag.to(device='cuda')
-                translation_PrMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                translation_PrMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 translation_PrMag = translation_PrMag.to(device='cuda')
-                axisangle_GtMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                axisangle_GtMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 axisangle_GtMag = axisangle_GtMag.to(device='cuda')
-                axisangle_PrMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float64) 
+                axisangle_PrMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
                 axisangle_PrMag = axisangle_PrMag.to(device='cuda')
                 #Mask_pose = torch.zeros(self.opt.batch_size, 1, dtype=torch.bool)   
              
@@ -797,7 +802,7 @@ class Trainer:
             print('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ End ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^')
             
         #print('Reprojection loss: ' + str(total_loss.data))
-        losses["loss"] = total_loss+ losses2["loss2"]
+        losses["loss"] = (total_loss + losses2["loss2"])
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):

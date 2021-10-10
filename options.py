@@ -33,8 +33,7 @@ class MonodepthOptions:
                                  default="mdp")
         self.parser.add_argument("--split",
                                  type=str,
-                                 help="which training split to use",
-                                 choices=["eigen_zhou", "eigen_full", "odom", "benchmark"],
+                                 help="which training split to use", #choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "BlenderRight", "BlenderRightStereo", "3DPrintedKnee_Mono", "3DPrintedKnee_Stereo"],
                                  default="eigen_zhou")
         self.parser.add_argument("--num_layers",
                                  type=int,
@@ -45,7 +44,7 @@ class MonodepthOptions:
                                  type=str,
                                  help="dataset to train on",
                                  default="kitti",
-                                 choices=["kitti", "kitti_odom", "kitti_depth", "kitti_test"])
+                                 choices=["kitti", "kitti_odom", "kitti_depth", "kitti_test", "Custom"])
         self.parser.add_argument("--png",
                                  help="if set, trains from raw KITTI png files (instead of jpgs)",
                                  action="store_true")
@@ -133,6 +132,7 @@ class MonodepthOptions:
                                  default="separate_resnet",
                                  choices=["posecnn", "separate_resnet", "shared"])
 
+
         # SYSTEM options
         self.parser.add_argument("--no_cuda",
                                  help="if set disables CUDA",
@@ -182,8 +182,7 @@ class MonodepthOptions:
         self.parser.add_argument("--eval_split",
                                  type=str,
                                  default="eigen",
-                                 choices=[
-                                    "eigen", "eigen_benchmark", "benchmark", "odom_9", "odom_10"],
+                                 #choices=["eigen", "eigen_benchmark", "benchmark", "odom_9", "odom_10"],
                                  help="which split to run eval on")
         self.parser.add_argument("--save_pred_disps",
                                  help="if set saves predicted disparities",
@@ -202,6 +201,32 @@ class MonodepthOptions:
                                  help="if set will perform the flipping post processing "
                                       "from the original monodepth paper",
                                  action="store_true")
+        
+        self.parser.add_argument("--use_pose",
+                                 help="if set will use the groundtruth poses for training",
+                                 default=False)
+        self.parser.add_argument("--use_quat",
+                                 help="if set will use the quaternion poses for training",
+                                 default=False)
+        self.parser.add_argument("--pose2_loss",
+                                 type=str,
+                                 help="L1 or L2",
+                                 default="L1",
+                                 choices=["L1", "L2"])
+        self.parser.add_argument("--pose2_optim",
+                                 type=str,
+                                 help="Adam or SGD",
+                                 default="Adam",
+                                 choices=["Adam", "SGD"])
+        self.parser.add_argument("--add_pose1_sup",
+                                 help="if set, will use the groundtruth poses norms and adds to the reprojection loss",
+                                 default=False)        
+        self.parser.add_argument("--trans_weight",
+                                 nargs="+",
+                                 type=float,
+                                 help="weight for the x, y, z translation",
+                                 default=[1, 1, 1]) 
+
 
     def parse(self):
         self.options = self.parser.parse_args()

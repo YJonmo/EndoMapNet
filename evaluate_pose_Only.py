@@ -62,27 +62,27 @@ class Evaluate:
             if self.opt.pose_model_type == "separate_resnet":
 
 
-                self.models["pose_encoder2"] = networks.ResnetEncoder(
+                self.models["pose_encoder"] = networks.ResnetEncoder(
                 self.opt.num_layers,
                 False,
                 num_input_images=self.num_pose_frames)
-                self.models["pose_encoder2"].to(self.device)
+                self.models["pose_encoder"].to(self.device)
 
                 
-                self.models["pose2"] = networks.PoseDecoder(
-                self.models["pose_encoder2"].num_ch_enc,
+                self.models["pose"] = networks.PoseDecoder(
+                self.models["pose_encoder"].num_ch_enc,
                     num_input_features=1,
                     num_frames_to_predict_for=self.num_frames_to_predict_for)
-                self.models["pose2"].to(self.device)
+                self.models["pose"].to(self.device)
 
 
             elif self.opt.pose_model_type == "posecnn":
 
-                self.models["pose2"] = networks.PoseCNN(
+                self.models["pose"] = networks.PoseCNN(
                     self.num_input_frames if self.opt.pose_model_input == "all" else 2)
-                self.models["pose2"].to(self.device)
+                self.models["pose"].to(self.device)
                 self.parameters_to_train2 = []
-                self.parameters_to_train2 += list(self.models["pose2"].parameters())
+                self.parameters_to_train2 += list(self.models["pose"].parameters())
 
 
         if self.opt.load_weights_folder is not None:
@@ -203,13 +203,13 @@ class Evaluate:
                 
                         
                     if self.opt.pose_model_type == "separate_resnet":
-                        pose_inputs2 = [self.models["pose_encoder2"](torch.cat(pose_inputs2, 1))]
+                        pose_inputs2 = [self.models["pose_encoder"](torch.cat(pose_inputs2, 1))]
 
                     elif self.opt.pose_model_type == "posecnn":
                         pose_inputs2 = torch.cat(pose_inputs2, 1)
 
     
-                    axisangle2, translation2 = self.models["pose2"](pose_inputs2)
+                    axisangle2, translation2 = self.models["pose"](pose_inputs2)
                     if (f_i < 0):
                         translation2 = translation2*(-1)
                     outputs2[("axisangle", 0, f_i)] = axisangle2[:, 0, 0 , :]
@@ -232,10 +232,10 @@ class Evaluate:
                 pose_inputs2 = torch.cat([inputs[("color_aug", i, 0)] for i in self.opt.frame_ids_sorted if i != "s"], 1)
                 
                 if self.opt.pose_model_type == "separate_resnet":
-                    pose_inputs2 = [self.models["pose_encoder2"](pose_inputs2)]
+                    pose_inputs2 = [self.models["pose_encoder"](pose_inputs2)]
 
 
-            axisangle2, translation2 = self.models["pose2"](pose_inputs2)
+            axisangle2, translation2 = self.models["pose"](pose_inputs2)
             for i, f_i in enumerate(self.opt.frame_ids[1:]):
                 if f_i != "s":
                     outputs2[("axisangle", 0, f_i)] = axisangle2[:, i, 0 , :]
@@ -331,7 +331,7 @@ class Evaluate:
         assert os.path.isdir(self.opt.load_weights_folder), \
             "Cannot find folder {}".format(self.opt.load_weights_folder)
         print("loading model from folder {}".format(self.opt.load_weights_folder))
-
+        print(self.opt)
         for n in self.opt.models_to_load:
             print("Loading {} weights...".format(n))
             path = os.path.join(self.opt.load_weights_folder, "{}.pth".format(n))

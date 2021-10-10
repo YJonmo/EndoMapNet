@@ -119,13 +119,20 @@ def evaluate(opt):
     for i in range(0, num_frames - 1):
         local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
         gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
-
+        print('###############local_xyzs#############')
+        print(local_xyzs)
         ates.append(compute_ate(gt_local_xyzs, local_xyzs))
 
     print("\n   Trajectory error: {:0.3f}, std: {:0.3f}\n".format(np.mean(ates), np.std(ates)))
 
     save_path = os.path.join(opt.load_weights_folder, "poses.npy")
     np.save(save_path, pred_poses)
+    print("-> Predictions saved to", save_path)
+    save_path = os.path.join(opt.load_weights_folder, "poses_gt_local2.npy")
+    np.save(save_path, gt_local_poses)
+    print("-> Predictions saved to", save_path)
+    save_path = os.path.join(opt.load_weights_folder, "poses_gt_global2.npy")
+    np.save(save_path, gt_global_poses)
     print("-> Predictions saved to", save_path)
 
 

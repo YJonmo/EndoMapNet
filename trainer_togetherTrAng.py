@@ -684,7 +684,7 @@ class Trainer:
             for Bach_ind in range(translation_gt.size()[0]):
                 for Frame_ind in range(translation_gt.size()[2]):
                     translation_gt[Bach_ind, :, Frame_ind] = translation_gt[Bach_ind, :, Frame_ind]*self.opt.trans_weight
-
+                
             losses2 = {}
                
             if  torch.mean(inputs[("translation", self.opt.frame_ids[1], 0)]) == 0:     # if the ground truth pose was not available then use the loss of the preveious run

@@ -21,7 +21,6 @@ from torchvision import transforms, datasets
 import networks
 from layers import disp_to_depth
 from utils import download_model_if_doesnt_exist
-from evaluate_depth import STEREO_SCALE_FACTOR
 
 
 def parse_args():
@@ -31,25 +30,21 @@ def parse_args():
     parser.add_argument('--image_path', type=str,
                         help='path to a test image or folder of images', required=True)
     parser.add_argument('--model_name', type=str,
-                        help='name of a pretrained model to use',
-                        choices=[
-                            "mono_640x192",
-                            "stereo_640x192",
-                            "mono+stereo_640x192",
-                            "mono_no_pt_640x192",
-                            "stereo_no_pt_640x192",
-                            "mono+stereo_no_pt_640x192",
-                            "mono_1024x320",
-                            "stereo_1024x320",
-                            "mono+stereo_1024x320"])
+                        help='name of a pretrained model to use')
+#                        choices=[
+#                            "mono_640x192",
+#                            "stereo_640x192",
+#                            "mono+stereo_640x192",
+#                            "mono_no_pt_640x192",
+#                            "stereo_no_pt_640x192",
+#                            "mono+stereo_no_pt_640x192",
+#                            "mono_1024x320",
+#                            "stereo_1024x320",
+#                            "mono+stereo_1024x320"])
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="jpg")
     parser.add_argument("--no_cuda",
                         help='if set, disables CUDA',
-                        action='store_true')
-    parser.add_argument("--pred_metric_depth",
-                        help='if set, predicts metric depth instead of disparity. (This only '
-                             'makes sense for stereo-trained KITTI models).',
                         action='store_true')
 
     return parser.parse_args()
@@ -65,19 +60,18 @@ def test_simple(args):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-
-    if args.pred_metric_depth and "stereo" not in args.model_name:
-        print("Warning: The --pred_metric_depth flag only makes sense for stereo-trained KITTI "
-              "models. For mono-trained models, output depths will not in metric space.")
-
-    download_model_if_doesnt_exist(args.model_name)
-    model_path = os.path.join("models", args.model_name)
+    if (args.model_name.split('/')[0] =='home'):
+        model_path = args.model_name
+    else:
+        download_model_if_doesnt_exist(args.model_name)
+        model_path = os.path.join("models", args.model_name)
     print("-> Loading model from ", model_path)
     encoder_path = os.path.join(model_path, "encoder.pth")
     depth_decoder_path = os.path.join(model_path, "depth.pth")
 
     # LOADING PRETRAINED MODEL
     print("   Loading pretrained encoder")
+    #encoder = networks.ResnetEncoder(18, False)
     encoder = networks.ResnetEncoder(18, False)
     loaded_dict_enc = torch.load(encoder_path, map_location=device)
 
@@ -104,10 +98,17 @@ def test_simple(args):
         # Only testing on a single image
         paths = [args.image_path]
         output_directory = os.path.dirname(args.image_path)
+        #output_directory = model_path
+
     elif os.path.isdir(args.image_path):
         # Searching folder for images
+#        paths = glob.glob(os.path.join(args.image_path, '*.{}'.format(args.ext)))
+        args.ext='png'
         paths = glob.glob(os.path.join(args.image_path, '*.{}'.format(args.ext)))
+        print(paths)
+        
         output_directory = args.image_path
+        #output_directory = model_path
     else:
         raise Exception("Can not find args.image_path: {}".format(args.image_path))
 
@@ -138,30 +139,42 @@ def test_simple(args):
 
             # Saving numpy file
             output_name = os.path.splitext(os.path.basename(image_path))[0]
-            scaled_disp, depth = disp_to_depth(disp, 0.1, 100)
-            if args.pred_metric_depth:
-                name_dest_npy = os.path.join(output_directory, "{}_depth.npy".format(output_name))
-                metric_depth = STEREO_SCALE_FACTOR * depth.cpu().numpy()
-                np.save(name_dest_npy, metric_depth)
-            else:
-                name_dest_npy = os.path.join(output_directory, "{}_disp.npy".format(output_name))
-                np.save(name_dest_npy, scaled_disp.cpu().numpy())
+            name_dest_npy = os.path.join(output_directory, "{}_disp.npy".format(output_name))
+            scaled_depth, depth = disp_to_depth(disp, 0.1, 250)
+            np.save(name_dest_npy, depth.cpu().numpy())
 
-            # Saving colormapped depth image
+
             disp_resized_np = disp_resized.squeeze().cpu().numpy()
             vmax = np.percentile(disp_resized_np, 95)
             normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
             mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
             colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
-            im = pil.fromarray(colormapped_im)
+            #imm = np.squeeze(disp.cpu().numpy())*200
+            imm = np.squeeze(depth.cpu().numpy())*200
+            imm = imm.astype('uint8')
+            im = pil.fromarray(imm)
+            
+            imm2 = np.squeeze(disp.cpu().numpy())*200
+            imm2 = imm2.astype('uint8')
+            im2 = pil.fromarray(imm2)            
+            
+#            # Saving colormapped depth image
+#            disp_resized_np = disp_resized.squeeze().cpu().numpy()
+#            vmax = np.percentile(disp_resized_np, 95)
+#            normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
+#            mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+#            colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
+#            im = pil.fromarray(colormapped_im)
 
-            name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
+            #name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
+            name_dest_im = os.path.join(output_directory, "{}_depth.jpeg".format(output_name))
             im.save(name_dest_im)
 
-            print("   Processed {:d} of {:d} images - saved predictions to:".format(
-                idx + 1, len(paths)))
-            print("   - {}".format(name_dest_im))
-            print("   - {}".format(name_dest_npy))
+            name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
+            im2.save(name_dest_im)
+
+            print("   Processed {:d} of {:d} images - saved prediction to {}".format(
+                idx + 1, len(paths), name_dest_im))
 
     print('-> Done!')
 
@@ -169,3 +182,24 @@ def test_simple(args):
 if __name__ == '__main__':
     args = parse_args()
     test_simple(args)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -112,3 +112,39 @@ def download_model_if_doesnt_exist(model_name):
             f.extractall(model_path)
 
         print("   Model unzipped to {}".format(model_path))
+
+
+
+def euler2world(theta) :
+    #https://www.learnopencv.com/rotation-matrix-to-euler-angles/
+    R_x = np.array([[1,         0,                  0                   ],
+                    [0,         math.cos(theta[0]), -math.sin(theta[0]) ],
+                    [0,         math.sin(theta[0]), math.cos(theta[0])  ]], np.float64)                  
+    R_y = np.array([[math.cos(theta[1]),    0,      math.sin(theta[1])  ],
+                    [0,                     1,      0                   ],
+                    [-math.sin(theta[1]),   0,      math.cos(theta[1])  ]], np.float64)              
+    R_z = np.array([[math.cos(theta[2]),    -math.sin(theta[2]),    0],
+                    [math.sin(theta[2]),    math.cos(theta[2]),     0],
+                    [0,                     0,                      1]], np.float64)                                 
+    R = np.dot(R_z, np.dot( R_y, R_x ))
+    return R
+
+def world2euler(World):   # best so far.
+    import sys
+
+
+    tol = sys.float_info.epsilon * 10
+    Euler = np.zeros((3), np.float64)
+    #https://www.meccanismocomplesso.org/en/3d-rotations-and-euler-angles-in-python/  
+    if abs(World.item(0,0))< tol and abs(World.item(1,0)) < tol:
+       eul1 = 0
+       eul2 = math.atan2(-World.item(2,0), World.item(0,0))
+       eul3 = math.atan2(-World.item(1,2), World.item(1,1))
+    else:   
+       Euler[2] = math.atan2(World.item(1,0),World.item(0,0))
+       sp = math.sin(Euler[0])
+       cp = math.cos(Euler[0])
+       Euler[1] = math.atan2(-World.item(2,0),cp*World.item(0,0)+sp*World.item(1,0))
+       Euler[0] = math.atan2(sp*World.item(0,2)-cp*World.item(1,2),cp*World.item(1,1)-sp*World.item(0,1))
+
+    return Euler

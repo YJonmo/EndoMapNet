@@ -25,6 +25,15 @@ import datasets
 import networks
 from IPython import embed
 
+    # from https://github.com/tinghuiz/SfMLearner
+def dump_xyz(source_to_target_transformations):
+    xyzs = []
+    cam_to_world = np.eye(4)
+    xyzs.append(cam_to_world[:3, 3])
+    for source_to_target_transformation in source_to_target_transformations:
+        cam_to_world = np.dot(cam_to_world, source_to_target_transformation)
+        xyzs.append(cam_to_world[:3, 3])
+    return xyzs
 
 class Trainer:
     def __init__(self, options):
@@ -39,17 +48,22 @@ class Trainer:
         self.parameters_to_train = []
 
         self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
-
+        print('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
+        print(self.device)
         self.num_scales = len(self.opt.scales)
         self.num_input_frames = len(self.opt.frame_ids)
+        self.opt.frame_ids_sorted = []
+        for i in self.opt.frame_ids: 
+            self.opt.frame_ids_sorted.append(i)
+        self.opt.frame_ids_sorted.sort()
         self.num_pose_frames = 2 if self.opt.pose_model_input == "pairs" else self.num_input_frames
-
+        print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%self.num_pose_frames', self.num_pose_frames)
         assert self.opt.frame_ids[0] == 0, "frame_ids must start with 0"
 
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
         if self.opt.use_stereo:
-            self.opt.frame_ids.append("s")
+            self.opt.frame_ids.append("s") # this gives the id 's' to  the other image and it means it is a stereo pair
 
         self.models["encoder"] = networks.ResnetEncoder(
             self.opt.num_layers, self.opt.weights_init == "pretrained")
@@ -67,14 +81,20 @@ class Trainer:
                     self.opt.num_layers,
                     self.opt.weights_init == "pretrained",
                     num_input_images=self.num_pose_frames)
+                print('LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',self.num_pose_frames)
+                print('self.models["pose_encoder"].num_ch_enc',self.models["pose_encoder"].num_ch_enc)
 
                 self.models["pose_encoder"].to(self.device)
                 self.parameters_to_train += list(self.models["pose_encoder"].parameters())
 
+#                self.models["pose"] = networks.PoseDecoder(
+#                    self.models["pose_encoder"].num_ch_enc,
+#                    num_input_features=1,
+#                    num_frames_to_predict_for=2)
                 self.models["pose"] = networks.PoseDecoder(
                     self.models["pose_encoder"].num_ch_enc,
                     num_input_features=1,
-                    num_frames_to_predict_for=2)
+                    num_frames_to_predict_for=self.num_pose_frames)
 
             elif self.opt.pose_model_type == "shared":
                 self.models["pose"] = networks.PoseDecoder(
@@ -88,9 +108,6 @@ class Trainer:
             self.parameters_to_train += list(self.models["pose"].parameters())
 
         if self.opt.predictive_mask:
-            assert self.opt.disable_automasking, \
-                "When using predictive_mask, please disable automasking with --disable_automasking"
-
             # Our implementation of the predictive masking baseline has the the same architecture
             # as our depth decoder. We predict a separate mask for each source frame.
             self.models["predictive_mask"] = networks.DepthDecoder(
@@ -112,13 +129,17 @@ class Trainer:
 
         # data
         datasets_dict = {"kitti": datasets.KITTIRAWDataset,
-                         "kitti_odom": datasets.KITTIOdomDataset}
+                         "kitti_odom": datasets.KITTIOdomDataset,
+                         "Custom": datasets.Custom}
         self.dataset = datasets_dict[self.opt.dataset]
-
+        
+        print('self.opt.split: ' + self.opt.split)
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files.txt")
+        print('fpathfpathfpath: ' + fpath)
+        print('os.path.dirname(__file__): ' + os.path.dirname(__file__))
 
         train_filenames = readlines(fpath.format("train"))
-        val_filenames = readlines(fpath.format("val"))
+        #val_filenames = readlines(fpath.format("val"))
         img_ext = '.png' if self.opt.png else '.jpg'
 
         num_train_samples = len(train_filenames)
@@ -130,13 +151,13 @@ class Trainer:
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
-        val_dataset = self.dataset(
-            self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
-        self.val_loader = DataLoader(
-            val_dataset, self.opt.batch_size, True,
-            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
-        self.val_iter = iter(self.val_loader)
+#        val_dataset = self.dataset(
+#            self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
+#            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
+#        self.val_loader = DataLoader(
+#            val_dataset, self.opt.batch_size, True,
+#            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+#        self.val_iter = iter(self.val_loader)
 
         self.writers = {}
         for mode in ["train", "val"]:
@@ -162,8 +183,10 @@ class Trainer:
             "de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
 
         print("Using split:\n  ", self.opt.split)
-        print("There are {:d} training items and {:d} validation items\n".format(
-            len(train_dataset), len(val_dataset)))
+        #print("There are {:d} training items and {:d} validation items\n".format(
+        #    len(train_dataset), len(val_dataset)))
+        print("There are {:d} training items\n".format(
+            len(train_dataset)))
 
         self.save_opts()
 
@@ -199,7 +222,8 @@ class Trainer:
         self.set_train()
 
         for batch_idx, inputs in enumerate(self.train_loader):
-
+            #print('batch_idxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ' + str(batch_idx))
+            #print(inputs)
             before_op_time = time.time()
 
             outputs, losses = self.process_batch(inputs)
@@ -221,7 +245,7 @@ class Trainer:
                     self.compute_depth_losses(inputs, outputs, losses)
 
                 self.log("train", inputs, outputs, losses)
-                self.val()
+                #self.val()
 
             self.step += 1
 
@@ -230,7 +254,7 @@ class Trainer:
         """
         for key, ipt in inputs.items():
             inputs[key] = ipt.to(self.device)
-
+            #print(key)
         if self.opt.pose_model_type == "shared":
             # If we are using a shared encoder for both depth and pose (as advocated
             # in monodepthv1), then all images are fed separately through the depth encoder.
@@ -248,12 +272,14 @@ class Trainer:
             features = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs = self.models["depth"](features)
 
+
         if self.opt.predictive_mask:
             outputs["predictive_mask"] = self.models["predictive_mask"](features)
 
         if self.use_pose_net:
             outputs.update(self.predict_poses(inputs, features))
-
+            #print('###########################################Output###############################')
+            #print(outputs)
         self.generate_images_pred(inputs, outputs)
         losses = self.compute_losses(inputs, outputs)
 
@@ -262,17 +288,19 @@ class Trainer:
     def predict_poses(self, inputs, features):
         """Predict poses between input frames for monocular sequences.
         """
+        pred_poses = []
         outputs = {}
         if self.num_pose_frames == 2:
             # In this setting, we compute the pose to each source frame via a
             # separate forward pass through the pose network.
 
             # select what features the pose network takes as input
-            if self.opt.pose_model_type == "shared":
+            if self.opt.pose_model_type == "shared": # if shared is used then the features are the same as features are obtained from the depth encoder
                 pose_feats = {f_i: features[f_i] for f_i in self.opt.frame_ids}
-            else:
+            else:# if shared is not used then instead of feature, images are given to the pose decoder
                 pose_feats = {f_i: inputs["color_aug", f_i, 0] for f_i in self.opt.frame_ids}
-
+                #print('###########################################Pose_Feature###############################')
+                #print(pose_feats)
             for f_i in self.opt.frame_ids[1:]:
                 if f_i != "s":
                     # To maintain ordering we always pass frames in temporal order
@@ -297,9 +325,15 @@ class Trainer:
         else:
             # Here we input all frames to the pose net (and predict all poses) together
             if self.opt.pose_model_type in ["separate_resnet", "posecnn"]:
-                pose_inputs = torch.cat(
-                    [inputs[("color_aug", i, 0)] for i in self.opt.frame_ids if i != "s"], 1)
+                pose_inputs = torch.cat([inputs[("color_aug", i, 0)] for i in self.opt.frame_ids_sorted if i != "s"], 1)
+#                for  i in self.opt.frame_ids: 
+#                    print('iiiiiiiiiiiiiiiiiii is: ' + str(i))
+#                    
+#                    if i != "s":
+#                        pose_inputs = torch.cat([inputs[("color_aug", i, 0)]], 1)
+#                        #pose_inputs = torch.cat(pose_inputs, 1)
 
+                print('hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' + str(self.opt.frame_ids))        
                 if self.opt.pose_model_type == "separate_resnet":
                     pose_inputs = [self.models["pose_encoder"](pose_inputs)]
 
@@ -307,14 +341,16 @@ class Trainer:
                 pose_inputs = [features[i] for i in self.opt.frame_ids if i != "s"]
 
             axisangle, translation = self.models["pose"](pose_inputs)
-
+            print(self.opt.pose_model_type)
+            print(axisangle.size())
+            print(translation.size())
+            #print(pose_inputs)
             for i, f_i in enumerate(self.opt.frame_ids[1:]):
                 if f_i != "s":
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                         axisangle[:, i], translation[:, i])
-
         return outputs
 
     def val(self):
@@ -363,14 +399,21 @@ class Trainer:
                     T = outputs[("cam_T_cam", 0, frame_id)]
 
                 # from the authors of https://arxiv.org/abs/1712.00175
-                if self.opt.pose_model_type == "posecnn":
+                if (self.opt.pose_model_type == "posecnn") and frame_id != "s":
+
+                    #if frame_id != "s":
+                    #print(outputs[("axisangle", 0, 0)])
+                    #print(outputs)
 
                     axisangle = outputs[("axisangle", 0, frame_id)]
                     translation = outputs[("translation", 0, frame_id)]
 
                     inv_depth = 1 / depth
                     mean_inv_depth = inv_depth.mean(3, True).mean(2, True)
-
+#                    pred_poses = []
+#                    pred_poses.append(transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().detach().numpy())
+#                    #print('###########################################translation##############################')
+#                    #print(pred_poses)
                     T = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0] * mean_inv_depth[:, 0], frame_id < 0)
 
@@ -478,8 +521,7 @@ class Trainer:
                 to_optimise, idxs = torch.min(combined, dim=1)
 
             if not self.opt.disable_automasking:
-                outputs["identity_selection/{}".format(scale)] = (
-                    idxs > identity_reprojection_loss.shape[1] - 1).float()
+                outputs["identity_selection/{}".format(scale)] = (idxs > 1).float()
 
             loss += to_optimise.mean()
 
@@ -524,6 +566,7 @@ class Trainer:
 
         for i, metric in enumerate(self.depth_metric_names):
             losses[metric] = np.array(depth_errors[i].cpu())
+
 
     def log_time(self, batch_idx, duration, loss):
         """Print a logging statement to the terminal
