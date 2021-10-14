@@ -9,7 +9,7 @@ from __future__ import absolute_import, division, print_function
 
 #from trainer_separate3 import Trainer
 #from trainer_poseOnly2 import Trainer
-from trainer_PoseDepth import Trainer
+from trainer_togetherTrAng_Mask import Trainer
 from options import MonodepthOptions
 
 options = MonodepthOptions()

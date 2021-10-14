@@ -60,11 +60,12 @@ def test_simple(args):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-    if (args.model_name.split('/')[0] =='home'):
-        model_path = args.model_name
-    else:
-        download_model_if_doesnt_exist(args.model_name)
-        model_path = os.path.join("models", args.model_name)
+#    if (args.model_name.split('/')[0] =='home'):
+#        model_path = args.model_name
+#    else:
+#        download_model_if_doesnt_exist(args.model_name)
+#        model_path = os.path.join("models", args.model_name)
+    model_path = model_path = args.model_name
     print("-> Loading model from ", model_path)
     encoder_path = os.path.join(model_path, "encoder.pth")
     depth_decoder_path = os.path.join(model_path, "depth.pth")
