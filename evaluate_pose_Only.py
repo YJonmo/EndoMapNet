@@ -39,7 +39,6 @@ class Evaluate:
         self.models = {}
         
         self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
-        print(self.device)
         self.num_input_frames = len(self.opt.frame_ids)
         self.opt.frame_ids_sorted = []
         for i in self.opt.frame_ids: 
@@ -151,8 +150,8 @@ class Evaluate:
             if batch_idx == 0:
                 for key, ipt in inputs.items():
                     inputs[key] = ipt.to(self.device)
-                    print(key)
-            print('batch_idxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ' + str(batch_idx))
+            #        print(key)
+            #print('batch_idxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ' + str(batch_idx))
 
 
           
@@ -175,8 +174,7 @@ class Evaluate:
         for key, ipt in inputs.items():
             inputs[key] = ipt.to(self.device)
             #print(key)
-        print('11111111111111111111111111111111111111111111111111111111111111111111111111inputs[("translation", frame_id, 0)]')
-
+        
 
         #outputs.update(self.predict_poses(inputs, features))
         outputs2 = {}
@@ -189,8 +187,6 @@ class Evaluate:
                 pose_feats = {f_i: features[f_i] for f_i in self.opt.frame_ids}
             else:# if shared is not used then instead of feature, images are given to the pose decoder
                 pose_feats = {f_i: inputs["color_aug", f_i, 0] for f_i in self.opt.frame_ids}
-                #print('###########################################Pose_Feature###############################')
-                #print(pose_feats)
             for f_i in self.opt.frame_ids[1:]:
                 if f_i != "s":
                     # To maintain ordering we always pass frames in temporal order
@@ -217,11 +213,11 @@ class Evaluate:
                     
                     #translation_gt = inputs[("translation", f_i, 0)]/(0.0015/0.1)/1000 
                     translation_gt = inputs[("translation", f_i, 0)]*(.01/1)
-                    print('\n translation_pred[:,0].data: ')
-                    print((translation2[:,0].data)*100)   
-                    print('translation_gt[:,0]: ')
-                    print((translation_gt[:,:].data))    
-                    print('\n ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ')
+                    #print('\n translation_pred[:,0].data: ')
+                    #print((translation2[:,0].data)*100)   
+                    #print('translation_gt[:,0]: ')
+                    #print((translation_gt[:,:].data))    
+                    #print('\n ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ')
                     
                     outputs2[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                     axisangle2[:, 0, : , :], translation2[:, 0, : , :], invert=(f_i < 0))
@@ -331,7 +327,7 @@ class Evaluate:
         assert os.path.isdir(self.opt.load_weights_folder), \
             "Cannot find folder {}".format(self.opt.load_weights_folder)
         print("loading model from folder {}".format(self.opt.load_weights_folder))
-        print(self.opt)
+        #print(self.opt)
         for n in self.opt.models_to_load:
             print("Loading {} weights...".format(n))
             path = os.path.join(self.opt.load_weights_folder, "{}.pth".format(n))
