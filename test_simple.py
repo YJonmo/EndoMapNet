@@ -149,29 +149,12 @@ def test_simple(args):
             normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
             mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
             colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
-            #imm = np.squeeze(disp.cpu().numpy())*200
-            imm = np.squeeze(depth.cpu().numpy())*200
-            imm = imm.astype('uint8')
-            im = pil.fromarray(imm)
-            
-            imm2 = np.squeeze(disp.cpu().numpy())*200
-            imm2 = imm2.astype('uint8')
-            im2 = pil.fromarray(imm2)            
-            
-#            # Saving colormapped depth image
-#            disp_resized_np = disp_resized.squeeze().cpu().numpy()
-#            vmax = np.percentile(disp_resized_np, 95)
-#            normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
-#            mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
-#            colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
-#            im = pil.fromarray(colormapped_im)
 
-            #name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
+            im = pil.fromarray(colormapped_im)
+
             name_dest_im = os.path.join(output_directory, "{}_depth.jpeg".format(output_name))
             im.save(name_dest_im)
 
-            name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
-            im2.save(name_dest_im)
 
             print("   Processed {:d} of {:d} images - saved prediction to {}".format(
                 idx + 1, len(paths), name_dest_im))
@@ -182,24 +165,3 @@ def test_simple(args):
 if __name__ == '__main__':
     args = parse_args()
     test_simple(args)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
