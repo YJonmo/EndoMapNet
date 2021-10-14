@@ -34,7 +34,7 @@ class MonodepthOptions:
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use", #choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "BlenderRight", "BlenderRightStereo", "3DPrintedKnee_Mono", "3DPrintedKnee_Stereo"],
-                                 default="eigen_zhou")
+                                 default="3DPrintedKnee_Stereo")
         self.parser.add_argument("--num_layers",
                                  type=int,
                                  help="number of resnet layers",

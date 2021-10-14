@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+#from tensorboard import SummaryWriter
 
 import json
 
@@ -25,15 +26,6 @@ import datasets
 import networks
 from IPython import embed
 
-    # from https://github.com/tinghuiz/SfMLearner
-def dump_xyz(source_to_target_transformations):
-    xyzs = []
-    cam_to_world = np.eye(4)
-    xyzs.append(cam_to_world[:3, 3])
-    for source_to_target_transformation in source_to_target_transformations:
-        cam_to_world = np.dot(cam_to_world, source_to_target_transformation)
-        xyzs.append(cam_to_world[:3, 3])
-    return xyzs
 
 class Trainer:
     def __init__(self, options):
@@ -46,7 +38,6 @@ class Trainer:
 
         self.models = {}
         self.parameters_to_train = []
-
         self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
         print('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
         print(self.device)
@@ -59,7 +50,12 @@ class Trainer:
         self.num_pose_frames = 2 if self.opt.pose_model_input == "pairs" else self.num_input_frames
         print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%self.num_pose_frames', self.num_pose_frames)
         assert self.opt.frame_ids[0] == 0, "frame_ids must start with 0"
-
+        
+        if self.opt.pose_model_input == "pairs":
+            self.num_frames_to_predict_for = 2
+        elif (self.opt.pose_model_input == "all") and (self.opt.use_stereo):
+            self.num_frames_to_predict_for = self.num_input_frames - 1 
+        
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
         if self.opt.use_stereo:
@@ -83,27 +79,53 @@ class Trainer:
                     num_input_images=self.num_pose_frames)
                 print('LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',self.num_pose_frames)
                 print('self.models["pose_encoder"].num_ch_enc',self.models["pose_encoder"].num_ch_enc)
-
+        
                 self.models["pose_encoder"].to(self.device)
                 self.parameters_to_train += list(self.models["pose_encoder"].parameters())
-
-#                self.models["pose"] = networks.PoseDecoder(
-#                    self.models["pose_encoder"].num_ch_enc,
-#                    num_input_features=1,
-#                    num_frames_to_predict_for=2)
+        
+#                if self.opt.use_pose=='1':
+#                    self.models["pose_encoder2"] = networks.ResnetEncoder(
+#                        self.opt.num_layers,
+#                        self.opt.weights_init == "pretrained",
+#                        num_input_images=self.num_pose_frames)
+#                    self.models["pose_encoder2"].to(self.device)
+#                    self.parameters_to_train2 = []
+#                    self.parameters_to_train2 += list(self.models["pose_encoder2"].parameters())
+#                    
+#                    self.models["pose2"] = networks.PoseDecoder(
+#                    self.models["pose_encoder2"].num_ch_enc,
+#                        num_input_features=1,
+#                        num_frames_to_predict_for=self.num_frames_to_predict_for)
+#                    self.models["pose2"].to(self.device)
+#                    self.parameters_to_train2 += list(self.models["pose2"].parameters())
+            
+        
+                #self.models["pose"] = networks.PoseDecoder(
+                #    self.models["pose_encoder"].num_ch_enc,
+                #    num_input_features=1,
+                #    num_frames_to_predict_for=2)
                 self.models["pose"] = networks.PoseDecoder(
                     self.models["pose_encoder"].num_ch_enc,
                     num_input_features=1,
-                    num_frames_to_predict_for=self.num_pose_frames)
-
+                    num_frames_to_predict_for=self.num_frames_to_predict_for)
+        
+                
             elif self.opt.pose_model_type == "shared":
                 self.models["pose"] = networks.PoseDecoder(
                     self.models["encoder"].num_ch_enc, self.num_pose_frames)
-
+        
             elif self.opt.pose_model_type == "posecnn":
                 self.models["pose"] = networks.PoseCNN(
                     self.num_input_frames if self.opt.pose_model_input == "all" else 2)
+                
+#                if self.opt.use_pose=='1':
+#                    self.models["pose2"] = networks.PoseCNN(
+#                        self.num_input_frames if self.opt.pose_model_input == "all" else 2)
+#                    self.models["pose2"].to(self.device)
+#                    self.parameters_to_train2 = []
+#                    self.parameters_to_train2 += list(self.models["pose2"].parameters())
 
+        
             self.models["pose"].to(self.device)
             self.parameters_to_train += list(self.models["pose"].parameters())
 
@@ -119,9 +141,26 @@ class Trainer:
         self.model_optimizer = optim.Adam(self.parameters_to_train, self.opt.learning_rate)
         self.model_lr_scheduler = optim.lr_scheduler.StepLR(
             self.model_optimizer, self.opt.scheduler_step_size, 0.1)
+        if self.opt.use_pose=='1':
+            
+            if self.opt.pose2_loss=="L2":
+                self.criterion = torch.nn.MSELoss()
+            else:
+                self.criterion = torch.nn.L1Loss()
+                #self.criterion = torch.nn.CrossEntropyLoss()
+                #self.criterion = torch.nn.PoissonNLLLoss()
+                
+#            if self.opt.pose2_optim=="SGD":
+#                self.model_optimizer2 = optim.SGD(self.parameters_to_train2, self.opt.learning_rate*5, momentum=0.9, weight_decay=self.opt.learning_rate/10)
 
-        if self.opt.load_weights_folder is not None:
-            self.load_model()
+#            else:    
+#                self.model_optimizer2 = optim.Adam(self.parameters_to_train2, self.opt.learning_rate)
+#           
+#            self.model_lr_scheduler2 = optim.lr_scheduler.StepLR(
+#                self.model_optimizer2, self.opt.scheduler_step_size, 0.1)
+#
+#        if self.opt.load_weights_folder is not None:
+#            self.load_model()
 
         print("Training model named:\n  ", self.opt.model_name)
         print("Models and tensorboard events files are saved to:\n  ", self.opt.log_dir)
@@ -139,25 +178,32 @@ class Trainer:
         print('os.path.dirname(__file__): ' + os.path.dirname(__file__))
 
         train_filenames = readlines(fpath.format("train"))
-        #val_filenames = readlines(fpath.format("val"))
+        
         img_ext = '.png' if self.opt.png else '.jpg'
 
         num_train_samples = len(train_filenames)
         self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
 
+#        train_dataset = self.dataset(
+#            self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
+#            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
+            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, use_pose=self.opt.use_pose)
+        
+        
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
-#        val_dataset = self.dataset(
-#            self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
-#            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
-#        self.val_loader = DataLoader(
-#            val_dataset, self.opt.batch_size, True,
-#            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
-#        self.val_iter = iter(self.val_loader)
+        if 1==1:
+            val_filenames = readlines(fpath.format("val"))
+            val_dataset = self.dataset(
+                self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
+                self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, use_pose=self.opt.use_pose)
+            self.val_loader = DataLoader(
+                val_dataset, self.opt.batch_size, True,
+                num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+            self.val_iter = iter(self.val_loader)
 
         self.writers = {}
         for mode in ["train", "val"]:
@@ -189,7 +235,14 @@ class Trainer:
             len(train_dataset)))
 
         self.save_opts()
-
+        #self.opt.trans_weight=torch.from_numpy(np.array(self.opt.trans_weight))
+        self.opt.trans_weight=torch.Tensor(np.array(self.opt.trans_weight))
+        self.opt.trans_weight = self.opt.trans_weight.to(self.device)
+        if self.opt.use_pose=='1':
+            self.last_loss = self.criterion(torch.zeros(1, dtype=torch.float32), torch.zeros(1, dtype=torch.float32))
+            self.last_loss = self.last_loss.to(self.device)
+            self.last_loss_val = self.criterion(torch.zeros(1, dtype=torch.float32), torch.zeros(1, dtype=torch.float32))
+            self.last_loss_val = self.last_loss_val.to(self.device)
     def set_train(self):
         """Convert all models to training mode
         """
@@ -217,12 +270,15 @@ class Trainer:
         """Run a single epoch of training and validation
         """
         self.model_lr_scheduler.step()
+#        if self.opt.use_pose=='1': 
+#            self.model_lr_scheduler2.step()
 
         print("Training")
         self.set_train()
 
         for batch_idx, inputs in enumerate(self.train_loader):
-            #print('batch_idxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ' + str(batch_idx))
+            
+            print('batch_idxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ' + str(batch_idx) + str('   self.epoch ')+ str(self.epoch))
             #print(inputs)
             before_op_time = time.time()
 
@@ -231,12 +287,22 @@ class Trainer:
             self.model_optimizer.zero_grad()
             losses["loss"].backward()
             self.model_optimizer.step()
-
+            #time.sleep(20.0)
+#            if self.opt.use_pose=='1':
+#                outputs2, losses2 = self.process_batch2(inputs)
+#                self.model_optimizer2.zero_grad()   # clear the buffer
+#                if not(torch.isnan(losses2["loss2"])):
+#                    
+#                    losses2["loss2"].backward()           # back propagate the loss                   
+#                    self.model_optimizer2.step()        # update the weights
+#                    losses["loss2"] = losses2["loss2"]
+#                    losses["loss2_Normal"] = losses2["loss2_Normal"]
+#                    losses["loss2_Raw"] = losses2["loss2_Raw"]            
             duration = time.time() - before_op_time
 
             # log less frequently after the first 2000 steps to save time & disk space
-            early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 2000
-            late_phase = self.step % 2000 == 0
+            early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 3
+            late_phase = self.step % 300 == 0
 
             if early_phase or late_phase:
                 self.log_time(batch_idx, duration, losses["loss"].cpu().data)
@@ -245,8 +311,9 @@ class Trainer:
                     self.compute_depth_losses(inputs, outputs, losses)
 
                 self.log("train", inputs, outputs, losses)
-                #self.val()
-
+                #if self.opt.use_pose=='1':
+                self.val_pose()
+                    
             self.step += 1
 
     def process_batch(self, inputs):
@@ -282,8 +349,10 @@ class Trainer:
             #print(outputs)
         self.generate_images_pred(inputs, outputs)
         losses = self.compute_losses(inputs, outputs)
-
+        #print('losses[loss]: ' + str(losses["loss"]))
         return outputs, losses
+
+
 
     def predict_poses(self, inputs, features):
         """Predict poses between input frames for monocular sequences.
@@ -321,6 +390,8 @@ class Trainer:
                     # Invert the matrix if the frame id is negative
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0], invert=(f_i < 0))
+#                    print('\n axisangle[:, 0].abs().mean(): ')
+#                    print(axisangle[:, 0].data)
 
         else:
             # Here we input all frames to the pose net (and predict all poses) together
@@ -333,7 +404,7 @@ class Trainer:
 #                        pose_inputs = torch.cat([inputs[("color_aug", i, 0)]], 1)
 #                        #pose_inputs = torch.cat(pose_inputs, 1)
 
-                print('hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' + str(self.opt.frame_ids))        
+                #print('hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' + str(self.opt.frame_ids))        
                 if self.opt.pose_model_type == "separate_resnet":
                     pose_inputs = [self.models["pose_encoder"](pose_inputs)]
 
@@ -341,9 +412,9 @@ class Trainer:
                 pose_inputs = [features[i] for i in self.opt.frame_ids if i != "s"]
 
             axisangle, translation = self.models["pose"](pose_inputs)
-            print(self.opt.pose_model_type)
-            print(axisangle.size())
-            print(translation.size())
+#            print(self.opt.pose_model_type)
+#            print(axisangle.size())
+#            print(translation.size())
             #print(pose_inputs)
             for i, f_i in enumerate(self.opt.frame_ids[1:]):
                 if f_i != "s":
@@ -351,6 +422,7 @@ class Trainer:
                     outputs[("translation", 0, f_i)] = translation
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                         axisangle[:, i], translation[:, i])
+                    
         return outputs
 
     def val(self):
@@ -364,6 +436,7 @@ class Trainer:
             inputs = self.val_iter.next()
 
         with torch.no_grad():
+            
             outputs, losses = self.process_batch(inputs)
 
             if "depth_gt" in inputs:
@@ -372,6 +445,46 @@ class Trainer:
             self.log("val", inputs, outputs, losses)
             del inputs, outputs, losses
 
+        self.set_train()
+
+    def val_pose(self):
+        """Validate the model on a single minibatch
+        """
+        self.set_eval()
+        try:
+            inputs = self.val_iter.next()
+        except StopIteration:
+            self.val_iter = iter(self.val_loader)
+            inputs = self.val_iter.next()
+
+        with torch.no_grad():
+            outputs, losses = self.process_batch(inputs)
+            #print('losssssssssssssssssssssssss')
+            #print(losses)
+            losses2 ={} 
+            if self.opt.use_pose=='1':     
+                if not(torch.isnan(losses["loss2"])):           
+                    losses2['val'] = losses['loss2']
+                    losses2['val_Normal'] = losses['loss2_Normal']
+                    losses2['val_Normal_Ang'] = losses['loss2_Normal_Ang']
+                    losses2['val_Normal_Mag'] = losses['loss2_Normal_Mag']
+                    losses2['val_Normal_Ang_Mag'] = losses['loss2_Normal_Ang_Mag']
+                    losses2["val_reprojection"] =  losses["loss_reprojection"]
+
+                    writer = self.writers["train"]
+                    for l, v in losses2.items():
+                        writer.add_scalar("{}".format(l), v, self.step)
+            else: 
+                losses2["val_reprojection"] =  losses["loss"]
+                   
+                writer = self.writers["train"]
+                for l, v in losses2.items():
+                    writer.add_scalar("{}".format(l), v, self.step)
+                
+                #self.log("val", inputs, outputs, losses)
+                #print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$Pose val loss: ' + str(losses3['loss2'])) 
+                del inputs, outputs, losses2, losses
+            
         self.set_train()
 
     def generate_images_pred(self, inputs, outputs):
@@ -534,7 +647,153 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
-        losses["loss"] = total_loss
+        #total_loss = torch.tensor([total_loss], dtype=torch.double)
+        
+        
+        losses2 = {}
+        losses2["loss2"] = 0
+        if self.opt.use_pose=='1':
+            frame_lengh = 0
+            for frame_id in (self.opt.frame_ids[1:]):
+                if frame_id != "s":
+                    frame_lengh +=1   
+            translation_gt = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
+            translation_gt = translation_gt.to(device='cuda')
+            translation_pred = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=False, dtype=torch.float32) 
+            translation_pred = translation_pred.to(device='cuda')
+            axisangle_gt = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
+            axisangle_gt = axisangle_gt.to(device='cuda')
+            axisangle_pred = torch.zeros(self.opt.batch_size, 3, frame_lengh, requires_grad=False, dtype=torch.float32) 
+            axisangle_pred = axisangle_pred.to(device='cuda')
+            #abs_diff_axang = torch.zeros(i, dtype=torch.float32) 
+            i=0
+            for frame_id in (self.opt.frame_ids[1:]):
+                if frame_id != "s":
+                    #axisangle_pred = outputs[("axisangle", 0, frame_id)]
+                    translation_pred[:, :, i] = outputs[("translation", 0, frame_id)][:, 0, 0 , :]*100
+                    translation_gt[:, :, i] = inputs[("translation", frame_id, 0)]*(1/1)
+                    axisangle_pred[:, :, i] = outputs[("axisangle", 0, frame_id)][:, 0, 0 , :]*100
+                    axisangle_gt[:, :, i] = inputs[("axisangle", frame_id, 0)]*(1/1)
+                    i += 1
+            #print('\n translation_pred[0,:,i].abs().mean(): ')
+            #print(translation_pred[0,:,i-1].data) 
+            #print('axisangle_gt[0,:,i].abs().mean(): ')
+            #print(axisangle_gt[0,:,i-1].data)    
+
+            NonZeroBatch = 0
+            for Bach_ind in range(translation_gt.size()[0]):
+                if  torch.norm(translation_gt[Bach_ind,:, 0]) != 0:
+                    NonZeroBatch +=1   
+            if NonZeroBatch != 0:
+                translation_gt2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                translation_gt2 = translation_gt2.to(device='cuda')
+                translation_pred2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                translation_pred2 = translation_pred2.to(device='cuda')
+                axisangle_gt2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                axisangle_gt2 = axisangle_gt2.to(device='cuda')
+                axisangle_pred2 = torch.zeros(NonZeroBatch, 3, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                axisangle_pred2 = axisangle_pred2.to(device='cuda')
+                translation_GtMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                translation_GtMag = translation_GtMag.to(device='cuda')
+                translation_PrMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                translation_PrMag = translation_PrMag.to(device='cuda')
+                axisangle_GtMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                axisangle_GtMag = axisangle_GtMag.to(device='cuda')
+                axisangle_PrMag = torch.zeros(NonZeroBatch, frame_lengh, requires_grad=True, dtype=torch.float32) 
+                axisangle_PrMag = axisangle_PrMag.to(device='cuda')
+                #Mask_pose = torch.zeros(self.opt.batch_size, 1, dtype=torch.bool)   
+             
+                NonZeroBatch = 0 		
+                for Bach_ind in range(translation_gt.size()[0]):	
+                    if  torch.norm(translation_gt[Bach_ind,:, 0]) != 0:
+                        #translation_gt2[NonZeroBatch, :, :] = translation_gt[Bach_ind, :, :]
+                        #translation_pred2[NonZeroBatch, :, :] = translation_pred[Bach_ind, :, :].clone()
+                        axisangle_gt2[NonZeroBatch, :, :] = axisangle_gt[Bach_ind, :, :].clone()
+                        axisangle_pred2[NonZeroBatch, :, :] = axisangle_pred[Bach_ind, :, :].clone()
+
+                        for Frame_ind in range(translation_gt.size()[2]):
+                    
+                            translation_gt2[NonZeroBatch, :, Frame_ind]= translation_gt[Bach_ind, :, Frame_ind].clone()*self.opt.trans_weight
+                            translation_pred2[NonZeroBatch, :, Frame_ind]= translation_pred[Bach_ind, :, Frame_ind].clone()*self.opt.trans_weight
+                            translation_GtMag[NonZeroBatch,Frame_ind]=torch.norm(translation_gt2[NonZeroBatch,:,Frame_ind].clone(),dim=0)
+                            translation_PrMag[NonZeroBatch, Frame_ind]= torch.norm(translation_pred2[NonZeroBatch, :, Frame_ind].clone(), dim=0)
+                            axisangle_GtMag[NonZeroBatch, Frame_ind]= torch.norm(axisangle_gt2[NonZeroBatch, :, Frame_ind].clone(), dim=0)
+                            axisangle_PrMag[NonZeroBatch, Frame_ind]= torch.norm(axisangle_pred2[NonZeroBatch,:,Frame_ind].clone(), dim=0) 
+
+                        NonZeroBatch = NonZeroBatch + 1
+
+
+                #Coeff =  15*frame_lengh
+                Coeff =  150
+                #losses2["loss2_Normal"]=self.criterion(F.normalize(translation_gt),F.normalize(translation_pred))/(15*frame_lengh) * 1.0     
+                losses2["loss2_Normal"]=self.criterion(F.normalize(translation_gt2),F.normalize(translation_pred2))/(Coeff*1.5)     
+                losses2["loss2_Normal_Mag"]=self.criterion(F.normalize(translation_GtMag, dim=0),F.normalize(translation_PrMag, dim=0))/Coeff      
+                #losses2["loss2_Raw"] = self.criterion(translation_gt, translation_pred) 
+                losses2["loss2_Normal_Ang"]=self.criterion(F.normalize(axisangle_gt2), F.normalize(axisangle_pred2))/(Coeff*2.5)  
+                losses2["loss2_Normal_Ang_Mag"]=self.criterion(F.normalize(axisangle_GtMag, dim=0), F.normalize(axisangle_PrMag, dim=0))/(Coeff*2)  
+
+                losses2["loss2"]=(losses2["loss2_Normal"]+losses2["loss2_Normal_Mag"]+losses2["loss2_Normal_Ang"]+losses2["loss2_Normal_Ang_Mag"])
+            
+
+                #print('It was hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1')             
+                #print('translation_gt[:, :, 0]')
+                #print(translation_gt[:, :, 0].data)
+                #print('translation_gt2[:, :, 0]')
+                #print(translation_gt2[:, :, 0].data)
+                #print('translation_GtMag[:, 0]')
+                #print(translation_GtMag[:, 0].data)
+                #print('It was hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2')
+
+            else:                
+                #Coeff =  15*frame_lengh
+                Coeff =  150
+                #losses2["loss2_Normal"]=self.criterion(F.normalize(translation_gt),F.normalize(translation_pred))/(15*frame_lengh) * 1.0     
+                losses2["loss2_Normal"]=self.criterion(F.normalize(translation_gt),F.normalize(translation_pred))/Coeff     
+                losses2["loss2_Normal_Mag"]=self.criterion(F.normalize(translation_gt, dim=0),F.normalize(translation_pred, dim=0))/Coeff      
+                #losses2["loss2_Raw"] = self.criterion(translation_gt, translation_pred) 
+                losses2["loss2_Normal_Ang"]=self.criterion(F.normalize(axisangle_gt), F.normalize(axisangle_pred))/(Coeff*2)  
+                losses2["loss2_Normal_Ang_Mag"]=self.criterion(F.normalize(axisangle_gt, dim=0), F.normalize(axisangle_pred, dim=0))/(Coeff*2)  
+                losses2["loss2"]=(losses2["loss2_Normal"]+losses2["loss2_Normal_Mag"]+losses2["loss2_Normal_Ang"]+losses2["loss2_Normal_Ang_Mag"])
+    
+                losses2["loss2"] = self.last_loss.item() + losses2["loss2_Normal"]*.00001;
+
+
+            del translation_gt, translation_pred, axisangle_gt, axisangle_pred
+
+
+            self.last_loss = (losses2["loss2"] + self.last_loss)/2 
+              
+
+            #print('loss2_Normal : ' + str(losses2["loss2_Normal"].data))
+            #print('loss2_Normal_Ang : ' + str(losses2["loss2_Normal_Ang"].data))
+            #print('loss2_Normal_Mag : ' + str(losses2["loss2_Normal_Mag"]))
+            #print('loss2_Normal_Ang_Mag : ' + str(losses2["loss2_Normal_Ang_Mag"]))
+
+   
+                
+            #losses2["loss2"] = losses2["loss2_Normal"] #+ losses2["loss2_Normal"]*(torch.norm(translation_gt)/frame_lengh)*2 #/frame_lengh #+ losses2["loss2_Raw"])/frame_lengh  
+                   
+       
+            losses["loss_reprojection"] = total_loss
+            losses["loss2_Normal"] = losses2["loss2_Normal"]
+            losses["loss2_Normal_Ang"] = losses2["loss2_Normal_Ang"]
+            losses["loss2_Normal_Mag"] = losses2["loss2_Normal_Mag"]
+            losses["loss2_Normal_Ang_Mag"] = losses2["loss2_Normal_Ang_Mag"]
+            losses["loss2"] = losses2["loss2"]
+            print('######################################This epoch start #############################')
+            print('Reprojection loss: ' + str(total_loss.data))
+            print('self.last_loss: '    + str(self.last_loss.data))
+            print('loss2: ' + str(losses2["loss2"]))   
+            
+            print("loss2_Normal: " + str(losses2["loss2_Normal"]))   
+            print("loss2_Normal_Mag: " + str(losses2["loss2_Normal_Mag"]))   
+
+            print("loss2_Normal_Ang: " + str(losses2["loss2_Normal_Ang"]))   
+            print("loss2_Normal_Ang_Mag: " + str(losses2["loss2_Normal_Ang_Mag"]))   
+            print('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ End ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^')
+            
+        #print('Reprojection loss: ' + str(total_loss.data))
+        losses["loss"] = (total_loss + losses2["loss2"])
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):
@@ -577,6 +836,8 @@ class Trainer:
             self.num_total_steps / self.step - 1.0) * time_sofar if self.step > 0 else 0
         print_string = "epoch {:>3} | batch {:>6} | examples/s: {:5.1f}" + \
             " | loss: {:.5f} | time elapsed: {} | time left: {}"
+        print(loss)
+        
         print(print_string.format(self.epoch, batch_idx, samples_per_sec, loss,
                                   sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left)))
 
@@ -671,3 +932,5 @@ class Trainer:
             self.model_optimizer.load_state_dict(optimizer_dict)
         else:
             print("Cannot find Adam weights so Adam is randomly initialized")
+
+

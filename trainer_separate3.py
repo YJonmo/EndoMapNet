@@ -25,15 +25,6 @@ import datasets
 import networks
 from IPython import embed
 
-    # from https://github.com/tinghuiz/SfMLearner
-def dump_xyz(source_to_target_transformations):
-    xyzs = []
-    cam_to_world = np.eye(4)
-    xyzs.append(cam_to_world[:3, 3])
-    for source_to_target_transformation in source_to_target_transformations:
-        cam_to_world = np.dot(cam_to_world, source_to_target_transformation)
-        xyzs.append(cam_to_world[:3, 3])
-    return xyzs
 
 class Trainer:
     def __init__(self, options):
