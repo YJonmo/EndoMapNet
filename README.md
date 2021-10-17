@@ -18,9 +18,10 @@ For sample use, please refer to the colab link:
 It is tested on Ubuntu 18 and cuda 10. 
 
 
-Here is also the link for semantic labels of the knee arthrocopy images:
+Here is also the link for semantic labels of the knee arthrocopy images (~3400 images):
 
 https://drive.google.com/file/d/1bwvJXzFETtwBIlgR--HSzOnrBqCpdVnF/view?usp=sharing
+
 
 TO DO LIST:
 
