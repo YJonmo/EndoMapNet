@@ -23,5 +23,5 @@ It is tested on Ubuntu 18 and cuda 10.
 
 TO DO LIST:
 
-Moer Google colab training examples
+More Google colab training examples
 
