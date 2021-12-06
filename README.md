@@ -23,7 +23,4 @@ Here is also the link for semantic labels of the knee arthrocopy images (~3400 i
 https://drive.google.com/file/d/1bwvJXzFETtwBIlgR--HSzOnrBqCpdVnF/view?usp=sharing
 
 
-TO DO LIST:
-
-More Google colab training examples
 
