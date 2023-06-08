@@ -4,7 +4,7 @@ All rights reserved.
 
 This work is based on the Monodepth2 repository: https://github.com/nianticlabs/monodepth2/tree/master
 
-The codes which are change in respect to the original Monodepth2 are as follow:
+The codes which are changed in respect to the original Monodepth2 are as follow:
 trainer.py, train.py, and options.py.
 
 
